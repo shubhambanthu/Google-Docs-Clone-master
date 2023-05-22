@@ -1,77 +1,50 @@
-import { Modal, ModalBody, ModalFooter } from "@material-tailwind/react";
-import Button from "@material-tailwind/react/Button";
-import Icon from "@material-tailwind/react/Icon";
-import { Link } from "react-router-dom";
-import { useState, useContext } from "react";
-import { doc, deleteDoc } from "firebase/firestore";
+import { useEffect, useState } from "react";
+import "react-draft-wysiwyg/dist/react-draft-wysiwyg.css";
+import { Editor } from "react-draft-wysiwyg";
+import { convertFromRaw, convertToRaw, EditorState } from "draft-js";
+import { doc, setDoc, getDoc } from "@firebase/firestore";
 import { firestore } from "../../fireabase/config";
-import { AuthContext } from "../../context/firebase";
 
-const DowRow = ({ id, fileName, date }) => {
-  const [showModel, setShoModel] = useState(false);
-  const toggle = () => setShoModel(!showModel);
-  const { user } = useContext(AuthContext);
-  const deleteDocument = async (id) => {
-    // console.log(id);
-    try {
-      const docRef = doc(firestore, "userDocs", `${user?.uid}`, "docs", id);
-      console.log(docRef);
-      if (docRef) {
-        deleteDoc(docRef);
-        setShoModel(false);
+const TextEditor = ({ uid, id }) => {
+  const [editorState, setEditorState] = useState(EditorState.createEmpty());
+  useEffect(() => {
+    const fetchData = async () => {
+      const docRef = doc(firestore, "userDocs", `${uid}`, "docs", `${id}`);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        if (docSnap?.data()?.editorState)
+          setEditorState(
+            EditorState.createWithContent(
+              convertFromRaw(docSnap.data()?.editorState)
+            )
+          );
       }
-    } catch (error) {
-      console.log(error);
-    }
-  };
+    };
+    fetchData();
+  }, [uid, id]);
   return (
-    <>
-      <div className="flex max-w-3xl mx-auto items-center p-4 rounded-lg hover:bg-gray-300 cursor-pointer text-gray-700 text-sm">
-        <Icon name="article" size="3xl" color="blue" />
-
-        <Link to={`/doc/${id}`} className="flex items-center w-full">
-          <p className="flex-grow pl-5 pr-10">{fileName}</p>
-          <p className="pr-5 text-sm truncate">{`${date
-            ?.toDate()
-            ?.toDateString("en-US")} at ${date
-            ?.toDate()
-            ?.toLocaleTimeString("en-US")}`}</p>
-        </Link>
-        <Button
-          color="gray"
-          buttonType="outline"
-          ripple="dark"
-          iconOnly={true}
-          rounded={true}
-          className="border-0 block"
-          onClick={() => setShoModel(true)}
-        >
-          <Icon name="delete" size="3xl" />
-        </Button>
-      </div>
-      <Modal size="sm" active={showModel} toggler={toggle}>
-        <ModalBody>Do you really want to delete this document?</ModalBody>
-        <ModalFooter>
-          <Button
-            color="red"
-            onClick={() => deleteDocument(id)}
-            ripple="dark"
-            type="submit"
-          >
-            Yes
-          </Button>
-          <Button
-            color="blue"
-            buttonType="link"
-            onClick={() => setShoModel(false)}
-            ripple="dark"
-          >
-            No
-          </Button>
-        </ModalFooter>
-      </Modal>
-    </>
+    <div className="bg-[#f9f8fa] min-h-screen pb-16">
+      <Editor
+        editorState={editorState}
+        onEditorStateChange={(e) => {
+          setEditorState(e);
+          const docRef = doc(firestore, "userDocs", `${uid}`, "docs", `${id}`);
+          setDoc(
+            docRef,
+            {
+              editorState: convertToRaw(editorState.getCurrentContent()),
+            },
+            { merge: true },
+            (doc) => console.log(doc)
+          );
+        }}
+        toolbarClassName="flex sticky top-0 z-50 !justify-center mx-auto !border-0 !border-b-2 !border-[#ccc] shadow-md"
+        editorClassName="mt-6 bg-white p-5 shadow-lg min-h-[1300px] max-w-5xl mx-auto mb-12 border-2 rounded-sm border-gray-300"
+        editorStyle={{ minHeight: "1300px" }}
+      />
+    </div>
   );
 };
 
-export default DowRow;
+export default TextEditor;
