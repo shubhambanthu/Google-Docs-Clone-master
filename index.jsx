@@ -1,158 +1,95 @@
-// importing components
-import Header from "../../components/Header";
-import DocRow from "../../components/DocRow/";
-
-// importing material ui
-import Button from "@material-tailwind/react/Button";
 import Icon from "@material-tailwind/react/Icon";
-import Modal from "@material-tailwind/react/Modal";
-import ModalFooter from "@material-tailwind/react/ModalFooter";
-import ModalBody from "@material-tailwind/react/ModalBody";
-import { useContext, useEffect, useState } from "react";
-
-// Firestore
-import { firestore } from "../../fireabase/config";
-import {
-  addDoc,
-//   getDocs,
-  collection,
-  serverTimestamp,
-//   query,
-//   orderBy,
-  onSnapshot,
-} from "firebase/firestore";
-import { useHistory } from "react-router";
+import Button from "@material-tailwind/react/Button";
+import pdfMake from "pdfmake/build/pdfmake";
+import pdfFonts from "pdfmake/build/vfs_fonts";
+// pdfMake.vfs = pdfFonts.pdfMake.vfs;
+import StateToPdfMake from "draft-js-export-pdfmake";
+import TextEditor from "../../components/TextEditor";
 import { AuthContext } from "../../context/firebase";
+import { useContext, useEffect } from "react";
+import { Link, useParams, useHistory } from "react-router-dom";
+import { signOut } from "@firebase/auth";
+import { auth, firestore } from "../../fireabase/config";
+import { doc, getDoc } from "@firebase/firestore";
+import { useState } from "react";
 
-const Home = () => {
-  const [showModel, setShoModel] = useState(false);
-  const [input, setInput] = useState("");
-  const [userDoc, setUserDoc] = useState([]);
+const Editor = () => {
+  const { user, setUser } = useContext(AuthContext);
+  const [userDoc, setUserDoc] = useState(null);
   const history = useHistory();
-
-  const { user } = useContext(AuthContext);
-
-  if (user === null) history.push("/login");
-  const createDoc = async () => {
-    if (!input) return;
-    setInput("");
-    setShoModel(false);
-
-    const docRef = await addDoc(
-      collection(firestore, "userDocs", `${user?.uid}`, "docs"),
-      {
-        name: `${input}`,
-        time: serverTimestamp(),
-      }
-    );
-    history.push(`/doc/${docRef?.id}`);
-  };
-  const model = (
-    <Modal size="sm" active={showModel} toggler={() => setShoModel(false)}>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          createDoc();
-        }}
-      >
-        <ModalBody>
-          <input
-            type="text"
-            className="outline-none w-full bg-gray-200  p-3 rounded-md"
-            placeholder="Enter name of the document."
-            onChange={({ target }) => setInput(target.value)}
-            value={input}
-          />
-        </ModalBody>
-        <ModalFooter>
-          <Button
-            color="blue"
-            buttonType="link"
-            onClick={() => setShoModel(false)}
-            ripple="dark"
-          >
-            Cancle
-          </Button>
-          <Button color="blue" onClick={createDoc} ripple="dark" type="submit">
-            Create
-          </Button>
-        </ModalFooter>
-      </form>
-    </Modal>
-  );
+  const { id } = useParams();
+  if (user === null) history.push("/");
 
   useEffect(() => {
-    const unsub = onSnapshot(
-      collection(firestore, "userDocs", `${user?.uid}`, "docs"),
-      (snap) => {
-        setUserDoc(
-          snap.docs?.map((doc) => ({
-            id: doc?.id,
-            ...doc.data(),
-          }))
-        );
-      }
-    );
-    return () => unsub();
-  }, [user?.uid]);
+    const getUerDoc = async () => {
+      const docRef = doc(
+        firestore,
+        "userDocs",
+        `${user?.uid}`,
+        "docs",
+        `${id}`
+      );
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) setUserDoc(docSnap.data());
+      else history.push("/");
+    };
+    getUerDoc();
+  }, [id, user?.uid, history]);
   return (
     <>
-      <Header />
-      {model}
-      <section
-        style={{ background: "#f8f9fa" }}
-        className="bg-[#f8f9fa] p-2 w-full mx-auto md:pb-10 md:px-10 "
-      >
-        <div className="max-w-3xl w-full mx-auto">
-          <div className="py-6 flex items-center justify-between">
-            <h2 className="text-gray-700">Start a new document</h2>
-            <Button
-              color="gray"
-              ripple="dark"
-              buttonType="outline"
-              iconOnly={true}
-              className="border-0"
-            >
-              <Icon name="more_vert" size="3xl" />
-            </Button>
-          </div>
-          <div>
-            <div
-              className="relative h-52 w-40 border-2 cursor-pointer hover:border-blue-700"
-              onClick={() => setShoModel(true)}
-            >
-              <img src="https://links.papareact.com/pju" alt="add-doc" />
-            </div>
-            <p className="ml-2 mt-2 font-semibold text-sm text-gray-700">
-              Blank
-            </p>
+      <header className="flex justify-between items-center p-3 pb-1">
+        <span className="cursor-pointer">
+          <Link to="/">
+            <Icon name="description" color="blue" size="5xl" />
+          </Link>
+        </span>
+        <div className="flex-grow px-2">
+          <h2 className="">{userDoc?.name}</h2>
+          <div className="flex items-center overflow-x-scroll text-sm space-x-1 ml-1 text-gray-600">
+            <p className="options">File</p>
+            <p className="options">Edit</p>
+            <p className="options">View</p>
+            <p className="options">Insert</p>
+            <p className="options">Format</p>
+            <p className="options">Tools</p>
+            <p className="options">Add-ons</p>
+            <p className="options">Help</p>
           </div>
         </div>
-      </section>
-      <section className="bg-white w-full md:px-10 md:mb-20">
-        <div className="max-w-3xl mx-auto py-8 text-sm text-gray-700">
-          <div className="flex p-4 items-center justify-between">
-            <h2 className="font-medium flex-grow">My Document</h2>
-            <p className="mr-12">Date Created</p>
-            <Icon name="folder" size="3xl" color="gray" />
-          </div>
-        </div>
-        {userDoc.length === 0 ? (
-          <div className="w-full text-center py-5">No documents</div>
-        ) : (
-          ""
-        )}
-        {userDoc?.map((doc) => (
-          <DocRow
-            id={doc?.id}
-            key={doc?.id}
-            fileName={doc?.name}
-            date={doc?.time}
-          />
-        ))}
-      </section>
+        <Button
+          size="regular"
+          style={{ background: "#1A73E8" }}
+          className="!bg-[#1A73E8] hover:bg-blue-500 !rounded-md md:inline-flex h-10"
+          rounded={false}
+          block={false}
+          iconOnly={false}
+          ripple="light"
+          onClick={() => {
+            const stateToPdfMake = new StateToPdfMake(userDoc?.editorState);
+            // console.log(stateToPdfMake.generate());
+            pdfMake.vfs = pdfFonts.pdfMake.vfs;
+            pdfMake
+              .createPdf(stateToPdfMake.generate())
+              .download(`${userDoc?.name}.pdf`);
+          }}
+        >
+          <Icon name="download" size="md" />
+          <span>Download</span>
+        </Button>
+        <img
+          src={user?.photoURL}
+          alt={user?.displayName}
+          title={user?.displayName}
+          onClick={() => {
+            signOut(auth);
+            setUser(null);
+          }}
+          className="cursor-pointer rounded-full h-10 w-10 ml-2"
+        />
+      </header>
+      <TextEditor uid={user?.uid} id={id} />
     </>
   );
 };
 
-export default Home;
+export default Editor;
